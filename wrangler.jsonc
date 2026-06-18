@@ -1,0 +1,52 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "secureshare",
+  "main": "src/index.js",
+  "compatibility_date": "2026-06-18",
+  "compatibility_flags": ["nodejs_compat"],
+
+  // Workers Assets — 原生资产托管
+  // 静态资产直接由 Cloudflare 边缘缓存处理，不计入 100,000 次/日 Worker 请求
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    // 仅 API 路由触发 Worker，静态资产直达边缘缓存
+    "run_worker_first": ["/api/*"],
+  },
+
+  // KV — 自动预配，wrangler deploy 时自动创建
+  // 免费计划: 100,000 读/天, 1,000 写/天, 1,000 删/天, 1GB 存储
+  "kv_namespaces": [
+    {
+      "binding": "SECURE_KV",
+    },
+  ],
+
+  // 可观测性 — 10% 采样以节约免费计划 200,000 日志/天 配额
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1,
+  },
+
+  // DO 迁移 — 删除已废弃的 SecretStore
+  "migrations": [
+    {
+      "tag": "v3",
+      "deleted_classes": ["SecretStore"],
+    },
+  ],
+
+  // Rate Limiting API — 官方绑定，每个 Cloudflare 节点独立计数
+  // 免费计划可用，无额外费用
+  "ratelimits": [
+    {
+      "name": "API_RATE_LIMITER",
+      "namespace_id": "424201",
+      "simple": {
+        "limit": 20,
+        "period": 60,
+      },
+    },
+  ],
+}

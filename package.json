@@ -1,0 +1,25 @@
+{
+  "name": "secureshare",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Zero-Knowledge End-to-End Encrypted Clipboard built on CF Workers Assets",
+  "scripts": {
+    "dev": "npm run build && wrangler dev",
+    "build": "tailwindcss -i ./src/input.css -o ./public/style.css --minify",
+    "deploy": "npm run build && wrangler deploy",
+    "setup": "node scripts/setup-kv.mjs",
+    "types": "wrangler types"
+  },
+  "cloudflare": {
+    "bindings": {
+      "SECURE_KV": {
+        "type": "kv",
+        "description": "系统将自动为您在云端创建一个免费的 KV 命名空间，用于存放加密数据。"
+      }
+    }
+  },
+  "devDependencies": {
+    "tailwindcss": "^4.3.1",
+    "wrangler": "^4.101.0"
+  }
+}

@@ -1,0 +1,548 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SecureShare</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body
+    class="bg-slate-950 text-slate-100 font-sans flex flex-col justify-between min-h-screen"
+  >
+    <header class="p-6 text-center max-w-xl mx-auto w-full relative">
+      <h1
+        class="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-emerald-400 tracking-tight"
+      >
+        🔒 SecureShare
+      </h1>
+      <p class="text-xs text-slate-500 mt-2 tracking-widest">
+        ZERO-KNOWLEDGE END-TO-END ENCRYPTED CLIPBOARD
+      </p>
+      <!-- 语言切换 -->
+      <button
+        id="lang-toggle"
+        onclick="toggleLanguage()"
+        class="absolute top-2 right-2 text-xs text-slate-500 hover:text-teal-400 border border-slate-700 hover:border-teal-500 rounded-lg px-2 py-1 transition-colors"
+      >
+        EN
+      </button>
+    </header>
+
+    <main class="flex-grow flex items-center justify-center p-4">
+      <div
+        class="max-w-md w-full bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl"
+      >
+        <!-- ===== 创建面板 ===== -->
+        <div id="pane-create" class="space-y-4">
+          <p class="text-xs text-slate-400" data-i18n="create-hint">
+            所有数据均在本地浏览器执行高级加密，解密钥匙绝不上云。
+          </p>
+          <textarea
+            id="text-input"
+            rows="5"
+            class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm focus:outline-none focus:border-teal-500 text-slate-300 resize-none placeholder-slate-600"
+            data-i18n-placeholder="input-placeholder"
+            placeholder="在此输入机密文本、个人私钥或敏感 Token..."
+          ></textarea>
+
+          <div
+            class="bg-slate-950/50 p-3 border border-slate-800 rounded-xl space-y-2"
+          >
+            <label
+              class="text-xs text-slate-400 block font-medium"
+              data-i18n="passphrase-label"
+            >
+              🛡️ 防拦截高级暗号 (可选)
+            </label>
+            <input
+              id="password-input"
+              type="password"
+              class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-teal-500 text-slate-300 font-mono"
+              data-i18n-placeholder="passphrase-placeholder"
+              placeholder="输入彼此约定的独立暗号，防止链接被黑客拦截"
+            />
+          </div>
+
+          <div class="flex items-center justify-between gap-4 pt-1">
+            <select
+              id="ttl-select"
+              class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-300 focus:outline-none"
+            >
+              <option value="300" data-i18n="ttl-5m">5 分钟后自毁</option>
+              <option value="3600" selected data-i18n="ttl-1h">
+                1 小时后自毁
+              </option>
+              <option value="86400" data-i18n="ttl-1d">1 天后自毁</option>
+            </select>
+            <button
+              onclick="createSecureLink()"
+              id="btn-submit"
+              class="bg-gradient-to-r from-teal-500 to-emerald-500 text-slate-950 font-bold px-5 py-2 rounded-xl text-xs transition-all active:scale-95 shadow-lg shadow-teal-500/5"
+              data-i18n="btn-create"
+            >
+              生成安全链接
+            </button>
+          </div>
+        </div>
+
+        <!-- ===== 结果面板 ===== -->
+        <div id="pane-result" class="hidden space-y-4">
+          <div
+            class="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl"
+          >
+            <p
+              class="text-xs text-emerald-400 font-medium"
+              data-i18n="result-success"
+            >
+              🎉 安全链接创建成功！注意：目标内容只能被成功调取一次。
+            </p>
+          </div>
+          <div class="relative">
+            <input
+              id="link-output"
+              type="text"
+              readonly
+              class="w-full bg-slate-950 border border-slate-800 rounded-xl pl-3 pr-20 py-3 text-xs text-teal-400 select-all font-mono focus:outline-none"
+            />
+            <button
+              onclick="copyLink()"
+              id="btn-copy"
+              class="absolute right-2 top-2 bottom-2 bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 rounded-lg text-xs transition-colors"
+              data-i18n="btn-copy"
+            >
+              复制
+            </button>
+          </div>
+          <button
+            onclick="window.location.reload()"
+            class="w-full text-center text-xs text-slate-500 hover:text-slate-400 underline pt-2 block"
+            data-i18n="btn-create-new"
+          >
+            重新创建新剪贴板
+          </button>
+        </div>
+
+        <!-- ===== 查看面板 ===== -->
+        <div id="pane-view" class="hidden space-y-4">
+          <div
+            class="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl"
+          >
+            <p
+              class="text-xs text-amber-400 font-medium"
+              data-i18n="view-warning"
+            >
+              ⚠️
+              阅后即焚警告：后端数据已永久粉碎！关闭或刷新本页面，内容将彻底蒸发。
+            </p>
+          </div>
+
+          <div
+            id="passphrase-lock-area"
+            class="hidden bg-slate-950 p-4 border border-slate-800 rounded-xl space-y-3"
+          >
+            <p
+              class="text-xs text-teal-400 font-medium"
+              data-i18n="passphrase-lock-hint"
+            >
+              🔒 此链接受高级暗号保护，请输入专属暗号解密：
+            </p>
+            <div class="flex gap-2">
+              <input
+                id="password-verify"
+                type="password"
+                class="flex-grow bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono focus:outline-none focus:border-teal-500 text-slate-200"
+                data-i18n-placeholder="passphrase-verify-placeholder"
+                placeholder="请输入约定的暗号"
+              />
+              <button
+                onclick="unlockWithPassphrase()"
+                class="bg-teal-500 text-slate-950 font-bold px-4 py-2 rounded-xl text-xs"
+                data-i18n="btn-decrypt"
+              >
+                解密
+              </button>
+            </div>
+          </div>
+
+          <div
+            id="text-output"
+            class="w-full bg-slate-950 border border-slate-800 rounded-xl p-4 text-xs whitespace-pre-wrap break-all min-h-[120px] font-mono text-slate-300 select-text"
+          ></div>
+          <button
+            onclick="window.location.href = window.location.origin"
+            class="w-full bg-slate-800 hover:bg-slate-700 font-medium py-2 rounded-xl text-xs transition-colors"
+            data-i18n="btn-share-too"
+          >
+            我也要安全分享数据
+          </button>
+        </div>
+      </div>
+    </main>
+
+    <footer
+      class="p-4 text-center text-xs text-slate-700 border-t border-slate-900 font-mono"
+    >
+      Built with Cloudflare Workers Assets &amp; Web Crypto API | Open Source
+    </footer>
+
+    <script>
+      // ============================================================
+      //  国际化 (i18n)
+      // ============================================================
+      const LANG_STORAGE_KEY = "secureshare-lang";
+
+      const translations = {
+        zh: {
+          "create-hint":
+            "所有数据均在本地浏览器执行高级加密，解密钥匙绝不上云。",
+          "input-placeholder": "在此输入机密文本、个人私钥或敏感 Token...",
+          "passphrase-label": "🛡️ 防拦截高级暗号 (可选)",
+          "passphrase-placeholder":
+            "输入彼此约定的独立暗号，防止链接被黑客拦截",
+          "ttl-5m": "5 分钟后自毁",
+          "ttl-1h": "1 小时后自毁",
+          "ttl-1d": "1 天后自毁",
+          "btn-create": "生成安全链接",
+          "btn-encrypting": "端到端加密中...",
+          "result-success":
+            "🎉 安全链接创建成功！注意：目标内容只能被成功调取一次。",
+          "btn-copy": "复制",
+          "btn-copied": "已复制！",
+          "btn-create-new": "重新创建新剪贴板",
+          "view-warning":
+            "⚠️ 阅后即焚警告：后端数据已永久粉碎！关闭或刷新本页面，内容将彻底蒸发。",
+          "passphrase-lock-hint":
+            "🔒 此链接受高级暗号保护，请输入专属暗号解密：",
+          "passphrase-verify-placeholder": "请输入约定的暗号",
+          "btn-decrypt": "解密",
+          "btn-share-too": "我也要安全分享数据",
+          "alert-empty-input": "请输入要分享的内容",
+          "alert-encrypt-failed": "加密失败，请刷新重试",
+          "alert-empty-passphrase": "请输入暗号",
+          "alert-wrong-passphrase":
+            "暗号错误，解密失败！后端密文在初次调取时已被安全销毁，您可继续在此尝试匹配，请勿刷新页面。",
+          "fetching-message": "⚡ 正在向边缘节点拉取密文并执行原子销毁...",
+          "error-consumed": "❌ 销毁失效：内容已被阅读抹除，或已过期。",
+          "error-key-corrupted": "❌ 解密失败：密钥损坏。",
+        },
+        en: {
+          "create-hint":
+            "All encryption happens locally in your browser. Your decryption key is never sent to any server.",
+          "input-placeholder":
+            "Enter secret text, private key, or sensitive token...",
+          "passphrase-label": "🛡️ Passphrase Lock (optional)",
+          "passphrase-placeholder":
+            "Set an extra passphrase known only to you and the recipient",
+          "ttl-5m": "Self-destruct in 5 min",
+          "ttl-1h": "Self-destruct in 1 hour",
+          "ttl-1d": "Self-destruct in 1 day",
+          "btn-create": "Create Secure Link",
+          "btn-encrypting": "Encrypting end-to-end...",
+          "result-success":
+            "🎉 Secure link created! Note: the content can only be retrieved once.",
+          "btn-copy": "Copy",
+          "btn-copied": "Copied!",
+          "btn-create-new": "Create a new secret",
+          "view-warning":
+            "⚠️ Burn-after-reading: the data has been permanently destroyed on the server. Closing or refreshing this page will make the content vanish forever.",
+          "passphrase-lock-hint":
+            "🔒 This link is protected by an extra passphrase. Enter it to decrypt:",
+          "passphrase-verify-placeholder": "Enter your passphrase",
+          "btn-decrypt": "Decrypt",
+          "btn-share-too": "Share your own secret",
+          "alert-empty-input": "Please enter content to share",
+          "alert-encrypt-failed":
+            "Encryption failed. Please refresh and try again.",
+          "alert-empty-passphrase": "Please enter a passphrase",
+          "alert-wrong-passphrase":
+            "Wrong passphrase! The ciphertext on the server has already been destroyed after the first fetch. You may keep trying — do not refresh the page.",
+          "fetching-message":
+            "⚡ Fetching ciphertext from the edge and atomically destroying it...",
+          "error-consumed":
+            "❌ Already consumed: the content was read and destroyed, or has expired.",
+          "error-key-corrupted": "❌ Decryption failed: key corrupted.",
+        },
+      };
+
+      let currentLang = localStorage.getItem(LANG_STORAGE_KEY) || "zh";
+
+      // 检测浏览器语言
+      function detectBrowserLang() {
+        if (localStorage.getItem(LANG_STORAGE_KEY)) return;
+        const navLang = (navigator.language || "").toLowerCase();
+        currentLang = navLang.startsWith("zh") ? "zh" : "en";
+      }
+
+      function t(key) {
+        return (
+          translations[currentLang]?.[key] || translations["zh"]?.[key] || key
+        );
+      }
+
+      function applyTranslation() {
+        // 更新带 data-i18n 属性的元素
+        document.querySelectorAll("[data-i18n]").forEach((el) => {
+          const key = el.getAttribute("data-i18n");
+          el.textContent = t(key);
+        });
+        // 更新 placeholder
+        document.querySelectorAll("[data-i18n-placeholder]").forEach((el) => {
+          const key = el.getAttribute("data-i18n-placeholder");
+          el.setAttribute("placeholder", t(key));
+        });
+        // 更新语言切换按钮文字
+        const toggle = document.getElementById("lang-toggle");
+        if (toggle) toggle.textContent = currentLang === "zh" ? "EN" : "中文";
+        // 更新 html lang
+        document.documentElement.lang = currentLang === "zh" ? "zh-CN" : "en";
+      }
+
+      function setLanguage(lang) {
+        currentLang = lang;
+        localStorage.setItem(LANG_STORAGE_KEY, lang);
+        applyTranslation();
+        // 更新 TTL 选项（select 的 option 文本已通过 data-i18n 更新）
+      }
+
+      function toggleLanguage() {
+        setLanguage(currentLang === "zh" ? "en" : "zh");
+      }
+
+      // ============================================================
+      //  密码学逻辑
+      // ============================================================
+      let globalCipherText = "";
+      let globalUrlKey = "";
+
+      async function deriveKey(passphrase, salt) {
+        const enc = new TextEncoder();
+        const baseKey = await window.crypto.subtle.importKey(
+          "raw",
+          enc.encode(passphrase),
+          "PBKDF2",
+          false,
+          ["deriveKey"],
+        );
+        return window.crypto.subtle.deriveKey(
+          { name: "PBKDF2", salt, iterations: 80000, hash: "SHA-256" },
+          baseKey,
+          { name: "AES-GCM", length: 256 },
+          false,
+          ["encrypt", "decrypt"],
+        );
+      }
+
+      async function aesEncrypt(plainText, key) {
+        const iv = window.crypto.getRandomValues(new Uint8Array(12));
+        const encoder = new TextEncoder();
+        const cipherBuffer = await window.crypto.subtle.encrypt(
+          { name: "AES-GCM", iv },
+          key,
+          encoder.encode(plainText),
+        );
+        return (
+          btoa(String.fromCharCode(...iv)) +
+          ":" +
+          btoa(String.fromCharCode(...new Uint8Array(cipherBuffer)))
+        );
+      }
+
+      async function aesDecrypt(combinedText, key) {
+        const [ivB64, cipherB64] = combinedText.split(":");
+        const iv = new Uint8Array(
+          atob(ivB64)
+            .split("")
+            .map((c) => c.charCodeAt(0)),
+        );
+        const ciphertext = new Uint8Array(
+          atob(cipherB64)
+            .split("")
+            .map((c) => c.charCodeAt(0)),
+        );
+        const decryptedBuffer = await window.crypto.subtle.decrypt(
+          { name: "AES-GCM", iv },
+          key,
+          ciphertext,
+        );
+        return new TextDecoder().decode(decryptedBuffer);
+      }
+
+      async function createSecureLink() {
+        const text = document.getElementById("text-input").value.trim();
+        if (!text) return alert(t("alert-empty-input"));
+        const pin = document.getElementById("password-input").value;
+
+        const btn = document.getElementById("btn-submit");
+        btn.disabled = true;
+        btn.textContent = t("btn-encrypting");
+
+        try {
+          const urlKeyObj = await window.crypto.subtle.generateKey(
+            { name: "AES-GCM", length: 256 },
+            true,
+            ["encrypt", "decrypt"],
+          );
+          let finalCipherText = await aesEncrypt(text, urlKeyObj);
+
+          let hasPin = "0";
+          if (pin) {
+            hasPin = "1";
+            const salt = window.crypto.getRandomValues(new Uint8Array(16));
+            const pinKeyObj = await deriveKey(pin, salt);
+            const doubleCipher = await aesEncrypt(finalCipherText, pinKeyObj);
+            finalCipherText =
+              btoa(String.fromCharCode(...salt)) + "::" + doubleCipher;
+          }
+
+          const ttl = document.getElementById("ttl-select").value;
+          const res = await fetch("/api/store", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              cipherText: finalCipherText,
+              ttl: parseInt(ttl),
+            }),
+          });
+
+          if (!res.ok) throw new Error();
+          const data = await res.json();
+
+          const exportedUrlKey = await window.crypto.subtle.exportKey(
+            "raw",
+            urlKeyObj,
+          );
+          const urlKeyB64 = btoa(
+            String.fromCharCode(...new Uint8Array(exportedUrlKey)),
+          );
+
+          const secureUrl =
+            window.location.origin +
+            "/?id=" +
+            data.id +
+            "#key=" +
+            urlKeyB64 +
+            "&p=" +
+            hasPin;
+
+          document.getElementById("link-output").value = secureUrl;
+          document.getElementById("pane-create").classList.add("hidden");
+          document.getElementById("pane-result").classList.remove("hidden");
+        } catch (e) {
+          alert(t("alert-encrypt-failed"));
+          btn.disabled = false;
+          btn.textContent = t("btn-create");
+        }
+      }
+
+      function copyLink() {
+        const input = document.getElementById("link-output");
+        navigator.clipboard.writeText(input.value);
+        const btn = document.getElementById("btn-copy");
+        btn.textContent = t("btn-copied");
+        btn.classList.replace("bg-slate-800", "bg-emerald-600");
+        setTimeout(() => {
+          btn.textContent = t("btn-copy");
+          btn.classList.replace("bg-emerald-600", "bg-slate-800");
+        }, 1500);
+      }
+
+      async function unlockWithPassphrase() {
+        const pin = document.getElementById("password-verify").value;
+        const outputDiv = document.getElementById("text-output");
+        if (!pin) return alert(t("alert-empty-passphrase"));
+
+        try {
+          const [saltB64, doubleCipher] = globalCipherText.split("::");
+          const salt = new Uint8Array(
+            atob(saltB64)
+              .split("")
+              .map((c) => c.charCodeAt(0)),
+          );
+
+          const pinKeyObj = await deriveKey(pin, salt);
+          const firstLayerCipher = await aesDecrypt(doubleCipher, pinKeyObj);
+
+          const urlKeyData = new Uint8Array(
+            atob(globalUrlKey)
+              .split("")
+              .map((c) => c.charCodeAt(0)),
+          );
+          const urlKeyObj = await window.crypto.subtle.importKey(
+            "raw",
+            urlKeyData,
+            { name: "AES-GCM" },
+            false,
+            ["decrypt"],
+          );
+
+          const finalPlainText = await aesDecrypt(firstLayerCipher, urlKeyObj);
+          outputDiv.innerText = finalPlainText;
+          document
+            .getElementById("passphrase-lock-area")
+            .classList.add("hidden");
+        } catch (e) {
+          alert(t("alert-wrong-passphrase"));
+        }
+      }
+
+      window.onload = async () => {
+        // 初始化国际化
+        detectBrowserLang();
+        applyTranslation();
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const id = urlParams.get("id");
+        const hash = window.location.hash;
+        const keyStr = hash.match(/#key=([^&]+)/)?.[1];
+        const hasPin = hash.match(/&p=([01])/)?.[1];
+
+        if (id && keyStr) {
+          document.getElementById("pane-create").classList.add("hidden");
+          document.getElementById("pane-view").classList.remove("hidden");
+          const outputDiv = document.getElementById("text-output");
+          outputDiv.innerText = t("fetching-message");
+
+          const res = await fetch("/api/get/" + id);
+          if (!res.ok) {
+            outputDiv.innerHTML =
+              "<span class='text-rose-500'>" + t("error-consumed") + "</span>";
+            return;
+          }
+          const data = await res.json();
+
+          globalCipherText = data.cipherText;
+          globalUrlKey = keyStr;
+
+          if (hasPin === "1") {
+            outputDiv.innerText = "";
+            document
+              .getElementById("passphrase-lock-area")
+              .classList.remove("hidden");
+          } else {
+            try {
+              const urlKeyData = new Uint8Array(
+                atob(keyStr)
+                  .split("")
+                  .map((c) => c.charCodeAt(0)),
+              );
+              const urlKeyObj = await window.crypto.subtle.importKey(
+                "raw",
+                urlKeyData,
+                { name: "AES-GCM" },
+                false,
+                ["decrypt"],
+              );
+              const plainText = await aesDecrypt(globalCipherText, urlKeyObj);
+              outputDiv.innerText = plainText;
+            } catch (e) {
+              outputDiv.innerHTML =
+                "<span class='text-rose-500'>" +
+                t("error-key-corrupted") +
+                "</span>";
+            }
+          }
+        }
+      };
+    </script>
+  </body>
+</html>
